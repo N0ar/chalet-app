@@ -1,6 +1,6 @@
 /* Le Chalet Sciez — application de contrats. Tout est stocké sur l'appareil (localStorage). */
 (function () {
-  const VERSION = '1.4';
+  const VERSION = '1.5';
   const $ = (q) => document.querySelector(q), $$ = (q) => Array.from(document.querySelectorAll(q));
   const { compute, check, build, fileName, eur, dmy, num } = window.Contrat;
 
@@ -44,12 +44,12 @@
     window.scrollTo(0, 0);
     if (tab === 'list') renderList();
     if (tab === 'set') renderSettings();
-    if (tab === 'cal') window.Agenda.open(S.hubUrl, () => show('set'), stayLink, (D) => window.Tarifs.nightText(D));
+    if (tab === 'cal') window.Agenda.open(S.hubUrl, () => show('set'), stayLink, (D) => window.Tarifs.nightText(D), stays);
     if (tab === 'tar') window.Tarifs.open(S.prixNuit);
   }
   // Depuis l'agenda : un séjour direct ouvre son contrat (mêmes dates), ou en propose la création.
   function stayLink(e) {
-    if (e.source !== 'google') return null;
+    if (e.source !== 'google' && e.source !== 'app') return null;
     const c = contracts.find((x) => x.arrivee === e.start && x.depart === e.end);
     if (c) return { txt: 'Contrat : ' + (c.loc.nom || 'sans nom') + ' · ' + progTxt(c).toLowerCase(), go: () => openForm(JSON.parse(JSON.stringify(c))) };
     const sh = window.Hub.data().suivi[e.start + '_' + e.end];
@@ -96,7 +96,20 @@
   // Le suivi est partagé via le hub sous la seule clé des dates du séjour : ni nom ni coordonnées.
   const skey = (c) => (c.arrivee && c.depart ? c.arrivee + '_' + c.depart : '');
   function shareSuivi(c) { const k = skey(c); if (k) window.Hub.change((d) => { d.suivi[k] = { pts: Object.assign({}, c.suivi), maj: new Date().toISOString() }; }); }
+  // Dates des contrats publiées dans le hub (sans nom) : elles bloquent le calendrier et s'affichent dans l'agenda de chaque appareil.
+  const stays = () => { const m = window.Hub.data().sejours; return Object.keys(m).map((k) => m[k]).filter((s) => s && !s.del && s.start && s.end > s.start).map((s) => ({ start: s.start, end: s.end, source: 'app' })); };
+  function shareStays() {
+    const m = window.Hub.data().sejours, up = [];
+    contracts.forEach((c) => {
+      if (!c.arrivee || !c.depart || c.depart <= c.arrivee) return;
+      const s = m[c.id];
+      if (s && s.del && String(s.maj || '') > (c.maj || '')) return; // supprimé ailleurs depuis : ne pas le faire réapparaître
+      if (!s || s.del || s.start !== c.arrivee || s.end !== c.depart) up.push(c);
+    });
+    if (up.length) window.Hub.change((d) => up.forEach((c) => { d.sejours[c.id] = { start: c.arrivee, end: c.depart, maj: new Date().toISOString() }; }));
+  }
   function reconcile() {
+    shareStays();
     const sh = window.Hub.data().suivi, up = []; let ch = false;
     contracts.forEach((c) => {
       const k = skey(c), r = k && sh[k]; if (!k) return;
@@ -199,7 +212,7 @@
     cur.maj = stamp();
     const copy = JSON.parse(JSON.stringify(cur));
     if (i >= 0) contracts[i] = copy; else contracts.push(copy);
-    store.set('chalet.contracts', contracts); $('#delBtn').hidden = false; if (copy.suivi && Object.keys(copy.suivi).length) shareSuivi(copy); renderSuivi(); syncContracts();
+    store.set('chalet.contracts', contracts); $('#delBtn').hidden = false; if (copy.suivi && Object.keys(copy.suivi).length) shareSuivi(copy); shareStays(); renderSuivi(); syncContracts();
   }
   $('#genBtn').addEventListener('click', () => {
     const errs = check(cur, S), box = $('#err');
@@ -217,7 +230,8 @@
   $('#delBtn').addEventListener('click', () => {
     if (!window.confirm('Supprimer définitivement ce contrat de l’appareil ?')) return;
     const gone = cur.id; contracts = contracts.filter((x) => x.id !== gone); store.set('chalet.contracts', contracts);
-    if (window.Hub.data().contrats.items[gone] || window.Coffre.ready()) window.Hub.change((d) => { d.contrats.items[gone] = { maj: stamp(), del: true }; }); toast('Contrat supprimé'); show('list');
+    if (window.Hub.data().contrats.items[gone] || window.Coffre.ready()) window.Hub.change((d) => { d.contrats.items[gone] = { maj: stamp(), del: true }; });
+    if (window.Hub.data().sejours[gone]) window.Hub.change((d) => { d.sejours[gone] = { maj: stamp(), del: true }; }); toast('Contrat supprimé'); show('list');
   });
 
   // ---------- partage du PDF ----------

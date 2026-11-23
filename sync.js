@@ -11,7 +11,7 @@
 
   const base = (u) => String(u || '').trim().replace(/\/(feed|data)\/.*$/, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
   const url = () => { const b = base(hub), t = window.Agenda.token.get(); return b && t ? b + '/data/app.json?key=' + encodeURIComponent(t) : ''; };
-  const shape = (d) => { d = d && typeof d === 'object' && !Array.isArray(d) ? d : {}; if (!d.suivi || typeof d.suivi !== 'object') d.suivi = {};
+  const shape = (d) => { d = d && typeof d === 'object' && !Array.isArray(d) ? d : {}; if (!d.suivi || typeof d.suivi !== 'object') d.suivi = {}; if (!d.sejours || typeof d.sejours !== 'object') d.sejours = {};
     if (!d.contrats || typeof d.contrats !== 'object') d.contrats = {}; if (!d.contrats.items || typeof d.contrats.items !== 'object') d.contrats.items = {}; return d; };
   // Fusion : pour les tarifs comme pour chaque séjour suivi, la modification la plus récente l'emporte.
   const newer = (a, b) => (!a ? b : !b ? a : String(a.maj || '') >= String(b.maj || '') ? a : b);
@@ -21,6 +21,7 @@
     if (t) o.tarifs = t;
     const each = (a, b) => { const m = {}; Object.keys(Object.assign({}, b, a)).forEach((k) => { m[k] = newer(a[k], b[k]); }); return m; };
     o.suivi = each(loc.suivi, rem.suivi);
+    o.sejours = each(loc.sejours, rem.sejours); // dates des contrats directs, pour bloquer le calendrier
     o.contrats = { items: each(loc.contrats.items, rem.contrats.items) }; // contrats chiffrés, un bloc par contrat
     return o;
   }

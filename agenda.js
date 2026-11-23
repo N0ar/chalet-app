@@ -6,8 +6,9 @@
     abritel: { n: 'Abritel', c: '#b97a06', t: '#f6e2b5' },
     google: { n: 'Direct ou blocage', c: '#3f8f5a', t: '#cfe8d6' }
   };
+  const APP = { n: 'Contrat direct', c: '#3f8f5a', t: '#cfe8d6' }; // dates d'un contrat créé dans l'app
   const OTHER = { n: 'Autre', c: '#5d6f75', t: '#dde3e5' };
-  const src = (id) => SRC[id] || OTHER;
+  const src = (id) => (id === 'app' ? APP : SRC[id] || OTHER);
   const TOKEN_KEY = 'chalet.token', CACHE_KEY = 'chalet.agenda';
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
   const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -26,7 +27,7 @@
     set(v) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } }
   };
 
-  let data = null, month = null, picked = null, busy = false, error = '', hub = '', goSettings = () => {}, link = () => null, price = () => '';
+  let data = null, month = null, picked = null, busy = false, error = '', hub = '', goSettings = () => {}, link = () => null, price = () => '', extra = () => [];
 
   // Accepte l'adresse du hub seule ou une adresse de flux complète collée par erreur.
   const base = (u) => String(u || '').trim().replace(/\/feed\/.*$/, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
@@ -51,8 +52,8 @@
     busy = false; render();
   }
 
-  function open(hubUrl, onSettings, linkFor, priceFor) {
-    hub = hubUrl; goSettings = onSettings || goSettings; link = linkFor || link; price = priceFor || price;
+  function open(hubUrl, onSettings, linkFor, priceFor, extraFor) {
+    hub = hubUrl; goSettings = onSettings || goSettings; link = linkFor || link; price = priceFor || price; extra = extraFor || extra;
     if (!data) data = cache.get();
     if (!month) { const n = new Date(); month = new Date(n.getFullYear(), n.getMonth(), 1, 12); }
     render();
@@ -72,7 +73,11 @@
       const d = el('div', 'empty'); d.append('Pour afficher l’agenda, indiquez l’adresse du hub et le jeton d’accès dans les Réglages.');
       const b = el('button', 'btn', 'Ouvrir les Réglages'); b.type = 'button'; b.addEventListener('click', () => goSettings()); root.append(d, b); return;
     }
-    const today = iso(new Date()), ev = data ? data.events : [];
+    const today = iso(new Date()), all = data ? data.events : [];
+    // Un séjour noté à la fois dans l'app et dans Google Agenda aux mêmes dates n'est affiché qu'une fois.
+    const ev0 = all.filter((e) => !(e.source === 'google' && all.some((o) => o.source === 'app' && o.start === e.start && o.end === e.end)));
+    // Séjours des contrats de l'app, sauf s'ils figurent déjà dans le flux du hub aux mêmes dates.
+    const ev = ev0.concat(extra().filter((x) => !ev0.some((e) => e.start === x.start && e.end === x.end && (e.source === 'google' || e.source === 'app'))));
 
     // État et avertissements
     const st = el('div', 'cal-status');
