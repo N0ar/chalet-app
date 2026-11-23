@@ -26,7 +26,7 @@
     set(v) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } }
   };
 
-  let data = null, month = null, picked = null, busy = false, error = '', hub = '', goSettings = () => {};
+  let data = null, month = null, picked = null, busy = false, error = '', hub = '', goSettings = () => {}, link = () => null;
 
   // Accepte l'adresse du hub seule ou une adresse de flux complète collée par erreur.
   const base = (u) => String(u || '').trim().replace(/\/feed\/.*$/, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
@@ -51,8 +51,8 @@
     busy = false; render();
   }
 
-  function open(hubUrl, onSettings) {
-    hub = hubUrl; goSettings = onSettings || goSettings;
+  function open(hubUrl, onSettings, linkFor) {
+    hub = hubUrl; goSettings = onSettings || goSettings; link = linkFor || link;
     if (!data) data = cache.get();
     if (!month) { const n = new Date(); month = new Date(n.getFullYear(), n.getMonth(), 1, 12); }
     render();
@@ -120,6 +120,7 @@
       const n = nights(e), box = el('div', 'n');
       box.append(el('b', null, cap(dayTxt(e.start)) + ' → ' + dayTxt(e.end)), el('span', null, n + ' nuit' + (n > 1 ? 's' : '') + ' · ' + s.n));
       if (ev.some((o) => o !== e && o.start === e.end)) box.append(el('span', 'turn', 'Nouvelle arrivée le jour du départ'));
+      const k = link(e); if (k) { box.append(el('span', 'lnk', k.txt + ' ›')); a.classList.add('tap'); a.addEventListener('click', k.go); }
       a.append(box); if (badge) a.append(el('em', null, badge)); return a;
     };
 

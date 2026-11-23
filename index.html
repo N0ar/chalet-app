@@ -20,7 +20,10 @@ body{ margin:0; min-height:100vh; padding-bottom:calc(64px + env(safe-area-inset
 header.top{ position:sticky; top:0; z-index:5; background:var(--lake); color:#fff; padding:calc(10px + env(safe-area-inset-top)) 16px 10px; display:flex; align-items:center; gap:10px; }
 header.top img{ width:34px; height:34px; border-radius:50%; background:#fff; }
 header.top h1{ font-size:17px; margin:0; font-weight:650; flex:1; }
-header.top button{ background:rgba(255,255,255,.16); color:#fff; border:0; border-radius:9px; padding:8px 12px; font-size:15px; font-weight:600; }
+header.top button{ background:rgba(255,255,255,.16); color:#fff; border:0; border-radius:9px; padding:8px 12px; font-size:15px; font-weight:600; min-height:40px; }
+header.top #setBtn{ padding:8px; width:40px; display:flex; align-items:center; justify-content:center; }
+header.top #setBtn svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+header.top [hidden]{ display:none !important; }
 main{ max-width:640px; margin:0 auto; padding:14px 16px 24px; }
 .view{ display:none; } .view.on{ display:block; }
 h2{ font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--mute); margin:20px 4px 8px; font-weight:650; }
@@ -54,7 +57,16 @@ h2{ font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--
 .list .n{ flex:1; min-width:0; }
 .list .n b{ display:block; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .list .n span{ color:var(--mute); font-size:13px; }
-.list .p{ font-weight:650; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.list .p{ font-weight:650; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; }
+.list .p small{ display:block; font-weight:650; font-size:11px; color:var(--lake); background:var(--lake2); border-radius:20px; padding:2px 8px; margin-top:4px; }
+.list .p small.ok{ color:#2c6b43; background:#dcefe2; }
+.chk{ display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); font-size:15px; min-height:48px; }
+.chk:last-child{ border-bottom:0; }
+.chk input{ width:22px; height:22px; flex:none; margin:0; accent-color:var(--lake); }
+.chk span{ flex:1; }
+.chk small{ color:var(--mute); font-size:12px; white-space:nowrap; }
+.chk.done span{ color:var(--mute); }
+h2 i{ font-style:normal; float:right; color:var(--lake); letter-spacing:0; }
 .empty{ text-align:center; color:var(--mute); padding:44px 20px; font-size:15px; line-height:1.5; }
 .empty img{ width:84px; opacity:.9; display:block; margin:0 auto 14px; }
 .note{ color:var(--mute); font-size:13px; line-height:1.45; margin:10px 4px 0; }
@@ -97,12 +109,14 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
 .stay .n b{ display:block; font-size:15px; }
 .stay .n span{ display:block; color:var(--mute); font-size:13px; }
 .stay .n .turn{ color:var(--wood); font-weight:600; }
+.stay .n .lnk{ color:var(--lake); font-weight:650; }
+.stay.tap{ cursor:pointer; }
 .stay em{ font-style:normal; font-size:12px; font-weight:650; color:var(--lake); background:var(--lake2); border-radius:20px; padding:4px 9px; white-space:nowrap; }
 .cal-free{ color:var(--mute); font-size:14px; padding:4px 4px 8px; }
 </style>
 </head>
 <body>
-<header class="top"><img id="logo" alt=""><h1 id="title">Contrats</h1><button id="topBtn" hidden></button></header>
+<header class="top"><img id="logo" alt=""><h1 id="title">Contrats</h1><button id="topBtn" type="button" hidden>Fermer</button><button id="setBtn" type="button" aria-label="Réglages"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button></header>
 <main>
   <!-- Liste -->
   <section class="view on" id="v-list">
@@ -113,6 +127,10 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
   <!-- Formulaire -->
   <section class="view" id="v-form">
     <form id="form" autocomplete="off" novalidate>
+      <div id="suiviBox" hidden>
+        <h2>Suivi <i id="suiviPct"></i></h2>
+        <div class="card" id="suivi"></div>
+      </div>
       <h2>Séjour</h2>
       <div class="card">
         <div class="f"><label for="arrivee">Arrivée</label><input type="date" id="arrivee" data-k="arrivee"></div>
@@ -209,10 +227,8 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
 </main>
 
 <nav class="tabs">
-  <button data-tab="list" class="on"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>Contrats</button>
-  <button data-tab="form"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Nouveau</button>
   <button data-tab="cal"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>Agenda</button>
-  <button data-tab="set"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Réglages</button>
+  <button data-tab="list" class="on"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>Contrats</button>
 </nav>
 
 <div class="sheet" id="sheet"><div class="in">

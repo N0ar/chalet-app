@@ -1,6 +1,6 @@
 /* Le Chalet Sciez — application de contrats. Tout est stocké sur l'appareil (localStorage). */
 (function () {
-  const VERSION = '1.1';
+  const VERSION = '1.2';
   const $ = (q) => document.querySelector(q), $$ = (q) => Array.from(document.querySelectorAll(q));
   const { compute, check, build, fileName, eur, dmy, num } = window.Contrat;
 
@@ -18,11 +18,17 @@
   const merge = (a, b) => { const o = Object.assign({}, a, b || {}); o.bailleur = Object.assign({}, a.bailleur, (b || {}).bailleur || {}); return o; };
   let S = merge(DEF, store.get('chalet.settings', {}));
   let contracts = store.get('chalet.contracts', []);
-  let cur = null, blob = null;
+  let cur = null, blob = null, back = 'list';
+
+  // Points de suivi d'un séjour direct. La valeur enregistrée est la date à laquelle le point a été coché.
+  const STEPS = [['envoye', 'Contrat envoyé'], ['signe', 'Contrat signé reçu'], ['arrhes', 'Arrhes reçues'], ['assurance', 'Attestation d’assurance reçue'],
+    ['solde', 'Solde reçu'], ['depot', 'Dépôt de garantie reçu'], ['edlEntree', 'État des lieux d’entrée'], ['edlSortie', 'État des lieux de sortie'], ['depotRendu', 'Dépôt restitué']];
+  const prog = (c) => STEPS.filter((s) => (c.suivi || {})[s[0]]).length;
+  const progTxt = (c) => (prog(c) === STEPS.length ? 'Suivi complet' : 'Suivi ' + prog(c) + '/' + STEPS.length);
 
   const today = () => { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); };
   const blank = () => ({ id: 'c' + Date.now(), etabliLe: today(), arrivee: '', depart: '', personnes: '', bebes: 0, animaux: 0, suppAnimaux: 0,
-    prixNuit: S.prixNuit, basePers: S.basePers, suppPers: S.suppPers, menage: S.menage, remiseMontant: '', remiseLibelle: '', arrhesPct: S.arrhesPct, depot: S.depot,
+    prixNuit: S.prixNuit, basePers: S.basePers, suppPers: S.suppPers, menage: S.menage, remiseMontant: '', remiseLibelle: '', arrhesPct: S.arrhesPct, depot: S.depot, suivi: {},
     loc: { nom: '', adresse: '', cpVille: '', pays: 'France', tel: '', email: '' } });
   const getP = (o, p) => p.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
   const setP = (o, p, v) => { const ks = p.split('.'); const l = ks.pop(); ks.reduce((x, k) => x[k], o)[l] = v; };
@@ -31,14 +37,25 @@
   // ---------- navigation ----------
   function show(tab) {
     $$('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + tab));
-    $$('nav.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+    $$('nav.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === (tab === 'form' ? 'list' : tab)));
+    if (tab !== 'set') back = tab;
+    $('#topBtn').hidden = tab !== 'set'; $('#setBtn').hidden = tab === 'set';
     $('#title').textContent = tab === 'list' ? 'Contrats' : tab === 'set' ? 'Réglages' : tab === 'cal' ? 'Agenda' : (contracts.some((c) => c.id === cur.id) ? 'Modifier le contrat' : 'Nouveau contrat');
     window.scrollTo(0, 0);
     if (tab === 'list') renderList();
     if (tab === 'set') renderSettings();
-    if (tab === 'cal') window.Agenda.open(S.hubUrl, () => show('set'));
+    if (tab === 'cal') window.Agenda.open(S.hubUrl, () => show('set'), stayLink);
   }
-  $$('nav.tabs button').forEach((b) => b.addEventListener('click', () => { if (b.dataset.tab === 'form') openForm(blank()); else show(b.dataset.tab); }));
+  // Depuis l'agenda : un séjour direct ouvre son contrat (mêmes dates), ou en propose la création.
+  function stayLink(e) {
+    if (e.source !== 'google') return null;
+    const c = contracts.find((x) => x.arrivee === e.start && x.depart === e.end);
+    if (c) return { txt: 'Contrat : ' + (c.loc.nom || 'sans nom') + ' · ' + progTxt(c).toLowerCase(), go: () => openForm(JSON.parse(JSON.stringify(c))) };
+    return { txt: 'Créer le contrat', go: () => openForm(Object.assign(blank(), { arrivee: e.start, depart: e.end })) };
+  }
+  $$('nav.tabs button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
+  $('#setBtn').addEventListener('click', () => show('set'));
+  $('#topBtn').addEventListener('click', () => show(back));
   $('#newBtn').addEventListener('click', () => openForm(blank()));
 
   // ---------- liste ----------
@@ -60,6 +77,7 @@
       const sp = document.createElement('span'); sp.textContent = (y || '') + ' · ' + k.nuits + ' nuit' + (k.nuits > 1 ? 's' : '') + ' · ' + k.pers + ' pers.';
       n.append(b, sp);
       const p = document.createElement('div'); p.className = 'p'; p.textContent = eur(k.total);
+      const pg = document.createElement('small'); pg.textContent = progTxt(c); if (prog(c) === STEPS.length) pg.className = 'ok'; p.append(pg);
       a.append(d, n, p); a.addEventListener('click', (e) => { e.preventDefault(); openForm(JSON.parse(JSON.stringify(c))); }); el.append(a);
     });
   }
@@ -70,7 +88,26 @@
     $$('#form [data-k]').forEach((i) => { const v = getP(cur, i.dataset.k); i.value = v == null ? '' : v; });
     $('#delBtn').hidden = !contracts.some((x) => x.id === cur.id);
     $('#err').hidden = true;
-    refresh(); show('form');
+    refresh(); renderSuivi(); show('form');
+  }
+  function renderSuivi() {
+    const saved = contracts.find((x) => x.id === cur.id), box = $('#suivi');
+    $('#suiviBox').hidden = !saved; box.textContent = ''; if (!saved) return;
+    cur.suivi = cur.suivi || {};
+    $('#suiviPct').textContent = prog(cur) + '/' + STEPS.length;
+    STEPS.forEach(([k, txt]) => {
+      const l = document.createElement('label'); l.className = 'chk' + (cur.suivi[k] ? ' done' : '');
+      const i = document.createElement('input'); i.type = 'checkbox'; i.checked = !!cur.suivi[k];
+      const s = document.createElement('span'); s.textContent = txt; l.append(i, s);
+      if (cur.suivi[k]) { const d = document.createElement('small'); d.textContent = dmy(cur.suivi[k]); l.append(d); }
+      i.addEventListener('change', () => {
+        if (i.checked) cur.suivi[k] = today(); else delete cur.suivi[k];
+        // Le suivi s'enregistre tout de suite, sans toucher aux autres champs du contrat enregistré.
+        const st = contracts.find((x) => x.id === cur.id); if (st) { st.suivi = Object.assign({}, cur.suivi); store.set('chalet.contracts', contracts); }
+        renderSuivi();
+      });
+      box.append(l);
+    });
   }
   function refresh() {
     const k = compute(cur);
@@ -100,7 +137,7 @@
     const i = contracts.findIndex((x) => x.id === cur.id);
     const copy = JSON.parse(JSON.stringify(cur));
     if (i >= 0) contracts[i] = copy; else contracts.push(copy);
-    store.set('chalet.contracts', contracts); $('#delBtn').hidden = false;
+    store.set('chalet.contracts', contracts); $('#delBtn').hidden = false; renderSuivi();
   }
   $('#genBtn').addEventListener('click', () => {
     const errs = check(cur, S), box = $('#err');
