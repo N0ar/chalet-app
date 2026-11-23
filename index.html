@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chalet Sciez</title>
+<meta name="theme-color" content="#1f5563">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Chalet">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{ --ink:#1c2b30; --mute:#5d6f75; --lake:#1f5563; --lake2:#e8f0f1; --wood:#b07a45; --line:#d5dee0; --bg:#f3f6f6; --card:#fff; --bad:#b3261e; }
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html{ font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); -webkit-text-size-adjust:100%; }
+body{ margin:0; min-height:100vh; padding-bottom:calc(64px + env(safe-area-inset-bottom)); }
+header.top{ position:sticky; top:0; z-index:5; background:var(--lake); color:#fff; padding:calc(10px + env(safe-area-inset-top)) 16px 10px; display:flex; align-items:center; gap:10px; }
+header.top img{ width:34px; height:34px; border-radius:50%; background:#fff; }
+header.top h1{ font-size:17px; margin:0; font-weight:650; flex:1; }
+header.top button{ background:rgba(255,255,255,.16); color:#fff; border:0; border-radius:9px; padding:8px 12px; font-size:15px; font-weight:600; }
+main{ max-width:640px; margin:0 auto; padding:14px 16px 24px; }
+.view{ display:none; } .view.on{ display:block; }
+h2{ font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--mute); margin:20px 4px 8px; font-weight:650; }
+.card{ background:var(--card); border-radius:14px; padding:4px 14px; box-shadow:0 1px 2px rgba(28,43,48,.06); }
+.f{ display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); min-height:48px; }
+.f:last-child{ border-bottom:0; }
+.f label{ flex:0 0 42%; font-size:15px; color:var(--ink); }
+.f label small{ display:block; color:var(--mute); font-size:12px; margin-top:1px; }
+.f input,.f select{ flex:1; min-width:0; border:0; background:transparent; font:inherit; font-size:16px; color:var(--ink); text-align:right; padding:6px 0; outline:0; -webkit-appearance:none; appearance:none; }
+.f input::placeholder{ color:#a9b5b8; }
+.f input[type=date]{ min-height:32px; }
+.f .u{ color:var(--mute); font-size:15px; }
+.f.col{ flex-direction:column; align-items:stretch; gap:2px; }
+.f.col label{ flex:none; font-size:12px; color:var(--mute); }
+.f.col input{ text-align:left; }
+.sum{ background:var(--card); border-radius:14px; overflow:hidden; box-shadow:0 1px 2px rgba(28,43,48,.06); }
+.sum div{ display:flex; justify-content:space-between; padding:9px 14px; font-size:15px; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+.sum div span:first-child{ color:var(--mute); }
+.sum .tot{ background:var(--lake); color:#fff; font-weight:700; font-size:17px; border:0; }
+.sum .tot span:first-child{ color:#fff; }
+.sum .pay{ background:var(--lake2); font-weight:600; border-bottom:1px solid #fff; }
+.err{ background:#fdecea; color:var(--bad); border-radius:12px; padding:10px 14px; font-size:14px; margin-top:14px; }
+.err p{ margin:3px 0; }
+.btn{ display:block; width:100%; border:0; border-radius:13px; padding:15px; font:inherit; font-size:17px; font-weight:650; background:var(--lake); color:#fff; margin-top:16px; }
+.btn:disabled{ opacity:.45; }
+.btn.sec{ background:var(--card); color:var(--lake); border:1px solid var(--line); }
+.btn.dan{ background:transparent; color:var(--bad); font-weight:500; font-size:15px; }
+.list a{ display:flex; align-items:center; gap:12px; background:var(--card); border-radius:14px; padding:13px 14px; margin-bottom:10px; color:inherit; text-decoration:none; box-shadow:0 1px 2px rgba(28,43,48,.06); }
+.list .d{ flex:0 0 52px; text-align:center; background:var(--lake2); color:var(--lake); border-radius:10px; padding:6px 0; font-weight:700; font-size:18px; line-height:1.05; }
+.list .d small{ display:block; font-size:11px; font-weight:600; text-transform:uppercase; }
+.list .n{ flex:1; min-width:0; }
+.list .n b{ display:block; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.list .n span{ color:var(--mute); font-size:13px; }
+.list .p{ font-weight:650; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.empty{ text-align:center; color:var(--mute); padding:44px 20px; font-size:15px; line-height:1.5; }
+.empty img{ width:84px; opacity:.9; display:block; margin:0 auto 14px; }
+.note{ color:var(--mute); font-size:13px; line-height:1.45; margin:10px 4px 0; }
+nav.tabs{ position:fixed; left:0; right:0; bottom:0; z-index:6; background:rgba(255,255,255,.96); backdrop-filter:blur(10px); border-top:1px solid var(--line); display:flex; padding-bottom:env(safe-area-inset-bottom); }
+nav.tabs button{ flex:1; border:0; background:none; padding:9px 0 8px; font:inherit; font-size:11px; color:var(--mute); display:flex; flex-direction:column; align-items:center; gap:3px; }
+nav.tabs button svg{ width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+nav.tabs button.on{ color:var(--lake); font-weight:650; }
+.sheet{ position:fixed; inset:0; z-index:20; background:rgba(28,43,48,.45); display:none; align-items:flex-end; }
+.sheet.on{ display:flex; }
+.sheet .in{ background:var(--bg); width:100%; max-width:640px; margin:0 auto; border-radius:20px 20px 0 0; padding:20px 16px calc(20px + env(safe-area-inset-bottom)); }
+.sheet h3{ margin:0 0 4px; font-size:19px; }
+.sheet p{ margin:0; color:var(--mute); font-size:14px; word-break:break-word; }
+.sig{ display:flex; align-items:center; gap:12px; padding:10px 0; }
+.sig img{ height:44px; max-width:55%; object-fit:contain; }
+.sig span{ color:var(--mute); font-size:14px; flex:1; }
+.sig button{ border:1px solid var(--line); background:var(--card); border-radius:9px; padding:8px 12px; font:inherit; font-size:14px; color:var(--lake); font-weight:600; }
+.toast{ position:fixed; left:50%; bottom:calc(84px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 16px; border-radius:22px; font-size:14px; z-index:30; opacity:0; transition:opacity .2s; pointer-events:none; white-space:nowrap; }
+.toast.on{ opacity:1; }
+</style>
+</head>
+<body>
+<header class="top"><img id="logo" alt=""><h1 id="title">Contrats</h1><button id="topBtn" hidden></button></header>
+<main>
+  <!-- Liste -->
+  <section class="view on" id="v-list">
+    <div id="list" class="list"></div>
+    <button class="btn" id="newBtn">Nouveau contrat</button>
+  </section>
+
+  <!-- Formulaire -->
+  <section class="view" id="v-form">
+    <form id="form" autocomplete="off" novalidate>
+      <h2>Séjour</h2>
+      <div class="card">
+        <div class="f"><label for="arrivee">Arrivée</label><input type="date" id="arrivee" data-k="arrivee"></div>
+        <div class="f"><label for="depart">Départ</label><input type="date" id="depart" data-k="depart"></div>
+        <div class="f"><label for="personnes">Personnes<small>hors bébés</small></label><input type="number" inputmode="numeric" min="1" id="personnes" data-k="personnes"></div>
+        <div class="f"><label for="bebes">Bébés</label><input type="number" inputmode="numeric" min="0" id="bebes" data-k="bebes"></div>
+        <div class="f"><label for="animaux">Animaux</label><input type="number" inputmode="numeric" min="0" id="animaux" data-k="animaux"></div>
+      </div>
+
+      <h2>Locataire</h2>
+      <div class="card">
+        <div class="f col"><label for="nom">Nom et prénom</label><input id="nom" data-k="loc.nom" placeholder="DUPONT Camille" autocapitalize="words"></div>
+        <div class="f col"><label for="adresse">Adresse</label><input id="adresse" data-k="loc.adresse" placeholder="12 rue des Lilas"></div>
+        <div class="f col"><label for="cpVille">Code postal et ville</label><input id="cpVille" data-k="loc.cpVille" placeholder="75011 Paris"></div>
+        <div class="f col"><label for="pays">Pays</label><input id="pays" data-k="loc.pays"></div>
+        <div class="f col"><label for="tel">Téléphone</label><input id="tel" type="tel" data-k="loc.tel" placeholder="+33 6 …"></div>
+        <div class="f col"><label for="email">E-mail</label><input id="email" type="email" inputmode="email" autocapitalize="off" data-k="loc.email" placeholder="nom@exemple.fr"></div>
+      </div>
+
+      <h2>Prix</h2>
+      <div class="card">
+        <div class="f"><label for="prixNuit">Prix par nuit<small id="baseLbl"></small></label><input inputmode="decimal" id="prixNuit" data-k="prixNuit"><span class="u">€</span></div>
+        <div class="f"><label for="suppPers">Personne en plus<small>par nuit</small></label><input inputmode="decimal" id="suppPers" data-k="suppPers"><span class="u">€</span></div>
+        <div class="f" id="rowAnimaux"><label for="suppAnimaux">Supplément animaux<small>pour le séjour</small></label><input inputmode="decimal" id="suppAnimaux" data-k="suppAnimaux"><span class="u">€</span></div>
+        <div class="f"><label for="menage">Ménage et linge</label><input inputmode="decimal" id="menage" data-k="menage"><span class="u">€</span></div>
+        <div class="f"><label for="remiseMontant">Remise</label><input inputmode="decimal" id="remiseMontant" data-k="remiseMontant" placeholder="0"><span class="u">€</span></div>
+        <div class="f col"><label for="remiseLibelle">Nom de la remise</label><input id="remiseLibelle" data-k="remiseLibelle" placeholder="Promotion Noël"></div>
+      </div>
+
+      <h2>Conditions</h2>
+      <div class="card">
+        <div class="f"><label for="arrhesPct">Arrhes</label><input inputmode="decimal" id="arrhesPct" data-k="arrhesPct"><span class="u">%</span></div>
+        <div class="f"><label for="depot">Dépôt de garantie</label><input inputmode="decimal" id="depot" data-k="depot"><span class="u">€</span></div>
+        <div class="f"><label for="etabliLe">Contrat établi le</label><input type="date" id="etabliLe" data-k="etabliLe"></div>
+      </div>
+
+      <h2>Récapitulatif</h2>
+      <div class="sum" id="sum"></div>
+      <div class="err" id="err" hidden></div>
+      <button class="btn" type="button" id="genBtn">Créer le contrat PDF</button>
+      <button class="btn dan" type="button" id="delBtn" hidden>Supprimer ce contrat</button>
+    </form>
+  </section>
+
+  <!-- Réglages -->
+  <section class="view" id="v-set">
+    <h2>Bailleur</h2>
+    <div class="card">
+      <div class="f col"><label>Nom</label><input data-s="bailleur.nom" autocapitalize="words"></div>
+      <div class="f col"><label>Adresse</label><input data-s="bailleur.adresse1"></div>
+      <div class="f col"><label>Code postal, ville, pays</label><input data-s="bailleur.adresse2"></div>
+      <div class="f col"><label>Téléphone</label><input type="tel" data-s="bailleur.tel"></div>
+      <div class="f col"><label>E-mail</label><input type="email" autocapitalize="off" data-s="bailleur.email1"></div>
+      <div class="f col"><label>Second e-mail (facultatif)</label><input type="email" autocapitalize="off" data-s="bailleur.email2"></div>
+      <div class="f"><label>Paraphe</label><input data-s="bailleur.initiales" autocapitalize="characters"></div>
+      <div class="sig"><img id="sigImg" alt="" hidden><span id="sigTxt">Aucune signature</span><button type="button" id="sigBtn">Choisir une image</button><input type="file" id="sigFile" accept="image/*" hidden></div>
+    </div>
+    <h2>Valeurs proposées par défaut</h2>
+    <div class="card">
+      <div class="f"><label>Prix par nuit</label><input inputmode="decimal" data-s="prixNuit"><span class="u">€</span></div>
+      <div class="f"><label>Tarif de base jusqu’à</label><input inputmode="numeric" data-s="basePers"><span class="u">pers.</span></div>
+      <div class="f"><label>Personne en plus<small>par nuit</small></label><input inputmode="decimal" data-s="suppPers"><span class="u">€</span></div>
+      <div class="f"><label>Capacité maximale</label><input inputmode="numeric" data-s="capacite"><span class="u">pers.</span></div>
+      <div class="f"><label>Ménage et linge</label><input inputmode="decimal" data-s="menage"><span class="u">€</span></div>
+      <div class="f"><label>Arrhes</label><input inputmode="decimal" data-s="arrhesPct"><span class="u">%</span></div>
+      <div class="f"><label>Dépôt de garantie</label><input inputmode="decimal" data-s="depot"><span class="u">€</span></div>
+    </div>
+    <h2>Clauses du contrat</h2>
+    <div class="card">
+      <div class="f"><label>Arrivée à partir de</label><input data-s="heureArrivee"></div>
+      <div class="f"><label>Départ au plus tard</label><input data-s="heureDepart"></div>
+      <div class="f"><label>Annulation gratuite<small>jours avant l’arrivée</small></label><input inputmode="numeric" data-s="annulJours"><span class="u">j</span></div>
+      <div class="f"><label>Retour du contrat<small>jours après l’envoi</small></label><input inputmode="numeric" data-s="delaiRetour"><span class="u">j</span></div>
+      <div class="f"><label>Forfait tabac</label><input inputmode="decimal" data-s="tabac"><span class="u">€</span></div>
+      <div class="f"><label>Recharge électrique<small>par kWh</small></label><input inputmode="decimal" data-s="kwh"><span class="u">€</span></div>
+      <div class="f col"><label>Site web</label><input data-s="site" autocapitalize="off"></div>
+    </div>
+    <h2>Sauvegarde</h2>
+    <button class="btn sec" type="button" id="expBtn">Exporter une sauvegarde</button>
+    <button class="btn sec" type="button" id="impBtn">Importer une sauvegarde ou des réglages</button>
+    <input type="file" id="impFile" accept="application/json,.json" hidden>
+    <p class="note">Les contrats et les coordonnées des locataires sont enregistrés uniquement sur cet appareil. Rien n’est envoyé sur Internet. Pensez à exporter une sauvegarde de temps en temps, et à supprimer les contrats dont vous n’avez plus besoin.</p>
+    <p class="note" id="ver"></p>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-tab="list" class="on"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>Contrats</button>
+  <button data-tab="form"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Nouveau</button>
+  <button data-tab="set"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Réglages</button>
+</nav>
+
+<div class="sheet" id="sheet"><div class="in">
+  <h3>Le contrat est prêt</h3><p id="sheetName"></p>
+  <button class="btn" id="shareBtn">Envoyer ou enregistrer</button>
+  <button class="btn sec" id="openBtn">Ouvrir le PDF</button>
+  <button class="btn dan" id="closeBtn">Fermer</button>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script src="vendor/pdfmake.min.js"></script>
+<script src="vendor/vfs_fonts.js"></script>
+<script src="assets.js"></script>
+<script src="contrat-pdf.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
