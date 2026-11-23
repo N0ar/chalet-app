@@ -1,6 +1,6 @@
 /* Le Chalet Sciez — application de contrats. Tout est stocké sur l'appareil (localStorage). */
 (function () {
-  const VERSION = '1.2';
+  const VERSION = '1.3';
   const $ = (q) => document.querySelector(q), $$ = (q) => Array.from(document.querySelectorAll(q));
   const { compute, check, build, fileName, eur, dmy, num } = window.Contrat;
 
@@ -18,7 +18,7 @@
   const merge = (a, b) => { const o = Object.assign({}, a, b || {}); o.bailleur = Object.assign({}, a.bailleur, (b || {}).bailleur || {}); return o; };
   let S = merge(DEF, store.get('chalet.settings', {}));
   let contracts = store.get('chalet.contracts', []);
-  let cur = null, blob = null, back = 'list';
+  let cur = null, blob = null, back = 'list', autoPrix = false;
 
   // Points de suivi d'un séjour direct. La valeur enregistrée est la date à laquelle le point a été coché.
   const STEPS = [['envoye', 'Contrat envoyé'], ['signe', 'Contrat signé reçu'], ['arrhes', 'Arrhes reçues'], ['assurance', 'Attestation d’assurance reçue'],
@@ -40,17 +40,20 @@
     $$('nav.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === (tab === 'form' ? 'list' : tab)));
     if (tab !== 'set') back = tab;
     $('#topBtn').hidden = tab !== 'set'; $('#setBtn').hidden = tab === 'set';
-    $('#title').textContent = tab === 'list' ? 'Contrats' : tab === 'set' ? 'Réglages' : tab === 'cal' ? 'Agenda' : (contracts.some((c) => c.id === cur.id) ? 'Modifier le contrat' : 'Nouveau contrat');
+    $('#title').textContent = tab === 'list' ? 'Contrats' : tab === 'set' ? 'Réglages' : tab === 'cal' ? 'Agenda' : tab === 'tar' ? 'Tarifs' : (contracts.some((c) => c.id === cur.id) ? 'Modifier le contrat' : 'Nouveau contrat');
     window.scrollTo(0, 0);
     if (tab === 'list') renderList();
     if (tab === 'set') renderSettings();
-    if (tab === 'cal') window.Agenda.open(S.hubUrl, () => show('set'), stayLink);
+    if (tab === 'cal') window.Agenda.open(S.hubUrl, () => show('set'), stayLink, (D) => window.Tarifs.nightText(D));
+    if (tab === 'tar') window.Tarifs.open(S.prixNuit);
   }
   // Depuis l'agenda : un séjour direct ouvre son contrat (mêmes dates), ou en propose la création.
   function stayLink(e) {
     if (e.source !== 'google') return null;
     const c = contracts.find((x) => x.arrivee === e.start && x.depart === e.end);
     if (c) return { txt: 'Contrat : ' + (c.loc.nom || 'sans nom') + ' · ' + progTxt(c).toLowerCase(), go: () => openForm(JSON.parse(JSON.stringify(c))) };
+    const sh = window.Hub.data().suivi[e.start + '_' + e.end];
+    if (sh) return { txt: progTxt({ suivi: sh.pts }) + ' · créer le contrat sur cet appareil', go: () => openForm(Object.assign(blank(), { arrivee: e.start, depart: e.end, suivi: Object.assign({}, sh.pts) })) };
     return { txt: 'Créer le contrat', go: () => openForm(Object.assign(blank(), { arrivee: e.start, depart: e.end })) };
   }
   $$('nav.tabs button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
@@ -84,11 +87,30 @@
 
   // ---------- formulaire ----------
   function openForm(c) {
-    cur = c; blob = null;
+    cur = c; blob = null; autoPrix = !contracts.some((x) => x.id === c.id);
     $$('#form [data-k]').forEach((i) => { const v = getP(cur, i.dataset.k); i.value = v == null ? '' : v; });
     $('#delBtn').hidden = !contracts.some((x) => x.id === cur.id);
     $('#err').hidden = true;
-    refresh(); renderSuivi(); show('form');
+    applyPrix(); refresh(); renderSuivi(); show('form');
+  }
+  // Le suivi est partagé via le hub sous la seule clé des dates du séjour : ni nom ni coordonnées.
+  const skey = (c) => (c.arrivee && c.depart ? c.arrivee + '_' + c.depart : '');
+  function shareSuivi(c) { const k = skey(c); if (k) window.Hub.change((d) => { d.suivi[k] = { pts: Object.assign({}, c.suivi), maj: new Date().toISOString() }; }); }
+  function reconcile() {
+    const sh = window.Hub.data().suivi, up = []; let ch = false;
+    contracts.forEach((c) => {
+      const k = skey(c), r = k && sh[k]; if (!k) return;
+      if (r) { if (JSON.stringify(r.pts || {}) !== JSON.stringify(c.suivi || {})) { c.suivi = Object.assign({}, r.pts); ch = true; } }
+      else if (c.suivi && Object.keys(c.suivi).length) up.push(c);
+    });
+    if (ch) store.set('chalet.contracts', contracts);
+    if (up.length) window.Hub.change((d) => up.forEach((c) => { d.suivi[skey(c)] = { pts: Object.assign({}, c.suivi), maj: new Date().toISOString() }; }));
+    return ch;
+  }
+  // Prix par nuit proposé d'après la grille de tarifs (moyenne des nuits du séjour), tant qu'il n'a pas été saisi à la main.
+  function applyPrix() {
+    if (!autoPrix) return; const v = window.Tarifs.avg(cur.arrivee, cur.depart); if (v == null) return;
+    cur.prixNuit = v; $('#prixNuit').value = String(v).replace('.', ',');
   }
   function renderSuivi() {
     const saved = contracts.find((x) => x.id === cur.id), box = $('#suivi');
@@ -103,7 +125,7 @@
       i.addEventListener('change', () => {
         if (i.checked) cur.suivi[k] = today(); else delete cur.suivi[k];
         // Le suivi s'enregistre tout de suite, sans toucher aux autres champs du contrat enregistré.
-        const st = contracts.find((x) => x.id === cur.id); if (st) { st.suivi = Object.assign({}, cur.suivi); store.set('chalet.contracts', contracts); }
+        const st = contracts.find((x) => x.id === cur.id); if (st) { st.suivi = Object.assign({}, cur.suivi); store.set('chalet.contracts', contracts); shareSuivi(st); }
         renderSuivi();
       });
       box.append(l);
@@ -128,16 +150,18 @@
   $('#form').addEventListener('input', (e) => {
     const i = e.target; if (!i.dataset.k) return;
     setP(cur, i.dataset.k, i.value);
+    if (i.dataset.k === 'prixNuit') autoPrix = false;
     $('#err').hidden = true;
     // Proposer un départ 7 nuits après l'arrivée tant que le départ est vide.
     if (i.dataset.k === 'arrivee' && i.value && !cur.depart) { const [y, m, j] = i.value.split('-').map(Number); const t = new Date(y, m - 1, j + 7, 12); cur.depart = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); $('#depart').value = cur.depart; }
+    if (i.dataset.k === 'arrivee' || i.dataset.k === 'depart') applyPrix();
     refresh();
   });
   function save() {
     const i = contracts.findIndex((x) => x.id === cur.id);
     const copy = JSON.parse(JSON.stringify(cur));
     if (i >= 0) contracts[i] = copy; else contracts.push(copy);
-    store.set('chalet.contracts', contracts); $('#delBtn').hidden = false; renderSuivi();
+    store.set('chalet.contracts', contracts); $('#delBtn').hidden = false; if (copy.suivi && Object.keys(copy.suivi).length) shareSuivi(copy); renderSuivi();
   }
   $('#genBtn').addEventListener('click', () => {
     const errs = check(cur, S), box = $('#err');
@@ -178,8 +202,9 @@
     $('#sigTxt').textContent = has ? 'Signature enregistrée' : 'Aucune signature';
     $('#ver').textContent = 'Version ' + VERSION + ' · ' + contracts.length + ' contrat' + (contracts.length > 1 ? 's' : '') + ' sur cet appareil';
   }
-  $('#v-set').addEventListener('input', (e) => { const i = e.target; if (!i.dataset.s) return; setP(S, i.dataset.s, i.value); store.set('chalet.settings', S); if (i.dataset.s === 'hubUrl') window.Agenda.reset(); });
+  $('#v-set').addEventListener('input', (e) => { const i = e.target; if (!i.dataset.s) return; setP(S, i.dataset.s, i.value); store.set('chalet.settings', S); if (i.dataset.s === 'hubUrl') { window.Agenda.reset(); window.Hub.init(S.hubUrl); } });
   $('#tok').addEventListener('input', (e) => { window.Agenda.token.set(e.target.value.trim()); window.Agenda.reset(); });
+  $('#topBtn').addEventListener('click', () => window.Hub.sync());
   $('#sigBtn').addEventListener('click', () => $('#sigFile').click());
   $('#sigFile').addEventListener('change', (e) => {
     const f = e.target.files[0]; if (!f) return;
@@ -204,14 +229,18 @@
       S = merge(merge(DEF, S), j.settings); store.set('chalet.settings', S);
       let n = 0;
       if (Array.isArray(j.contracts)) j.contracts.forEach((c) => { if (c && c.id && c.loc && !contracts.some((x) => x.id === c.id)) { contracts.push(c); n++; } });
-      store.set('chalet.contracts', contracts); renderSettings();
+      store.set('chalet.contracts', contracts); renderSettings(); window.Hub.init(S.hubUrl);
       toast(n ? 'Réglages et ' + n + ' contrat' + (n > 1 ? 's' : '') + ' importés' : 'Réglages importés');
     } catch (err) { toast('Ce fichier n’est pas une sauvegarde valide'); }
   });
 
   // ---------- démarrage ----------
   $('#logo').src = window.ASSETS.logo;
+  window.Hub.init(S.hubUrl);
+  window.Hub.on(() => { if (reconcile() && $('#v-list').classList.contains('on')) renderList(); });
   cur = blank(); show('list');
+  if (window.Hub.ready) window.Hub.sync();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && window.Hub.ready) window.Hub.sync(); });
   if (!S.bailleur.nom) toast('Commencez par les Réglages');
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

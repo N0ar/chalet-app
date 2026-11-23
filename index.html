@@ -112,6 +112,14 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
 .stay .n .lnk{ color:var(--lake); font-weight:650; }
 .stay.tap{ cursor:pointer; }
 .stay em{ font-style:normal; font-size:12px; font-weight:650; color:var(--lake); background:var(--lake2); border-radius:20px; padding:4px 9px; white-space:nowrap; }
+.seg{ display:flex; background:var(--lake2); border-radius:11px; padding:3px; margin-bottom:12px; }
+.seg button{ flex:1; border:0; background:transparent; border-radius:9px; padding:8px; font:inherit; font-size:15px; font-weight:600; color:var(--lake); }
+.seg button.on{ background:var(--card); box-shadow:0 1px 2px rgba(28,43,48,.12); }
+.cal-grid.price .day{ height:52px; flex-direction:column; gap:1px; }
+.cal-grid.price .day small{ font-size:11px; color:var(--mute); }
+.cal-grid.price .day.per{ background:#f6ead9; }
+.cal-grid.price .day.per small{ color:#8a5a26; font-weight:650; }
+.stay.old{ opacity:.55; }
 .cal-free{ color:var(--mute); font-size:14px; padding:4px 4px 8px; }
 </style>
 </head>
@@ -178,6 +186,9 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
   <!-- Agenda -->
   <section class="view" id="v-cal"><div id="cal"></div></section>
 
+  <!-- Tarifs -->
+  <section class="view" id="v-tar"><div id="tar"></div></section>
+
   <!-- Réglages -->
   <section class="view" id="v-set">
     <h2>Bailleur</h2>
@@ -211,17 +222,17 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
       <div class="f"><label>Recharge électrique<small>par kWh</small></label><input inputmode="decimal" data-s="kwh"><span class="u">€</span></div>
       <div class="f col"><label>Site web</label><input data-s="site" autocapitalize="off"></div>
     </div>
-    <h2>Agenda</h2>
+    <h2>Hub (agenda et partage)</h2>
     <div class="card">
-      <div class="f col"><label>Adresse du hub de calendriers</label><input data-s="hubUrl" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://…"></div>
-      <div class="f col"><label for="tok">Jeton d’accès</label><input id="tok" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Collez le jeton ici"></div>
+      <div class="f col"><label>Adresse du hub</label><input data-s="hubUrl" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://…"></div>
+      <div class="f col"><label for="tok">Jeton de l’application</label><input id="tok" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Collez le jeton ici"></div>
     </div>
-    <p class="note">Le jeton reste sur cet appareil. Il n’est ni envoyé ailleurs qu’au hub, ni inclus dans les sauvegardes.</p>
+    <p class="note">Le jeton reste sur cet appareil. Il n’est ni envoyé ailleurs qu’au hub, ni inclus dans les sauvegardes. Les tarifs et le suivi des séjours (dates et points cochés, sans nom) sont partagés via le hub entre vos appareils.</p>
     <h2>Sauvegarde</h2>
     <button class="btn sec" type="button" id="expBtn">Exporter une sauvegarde</button>
     <button class="btn sec" type="button" id="impBtn">Importer une sauvegarde ou des réglages</button>
     <input type="file" id="impFile" accept="application/json,.json" hidden>
-    <p class="note">Les contrats et les coordonnées des locataires sont enregistrés uniquement sur cet appareil. Rien n’est envoyé sur Internet. Pensez à exporter une sauvegarde de temps en temps, et à supprimer les contrats dont vous n’avez plus besoin.</p>
+    <p class="note">Les contrats et les coordonnées des locataires sont enregistrés uniquement sur cet appareil. Pensez à exporter une sauvegarde de temps en temps, et à supprimer les contrats dont vous n’avez plus besoin.</p>
     <p class="note" id="ver"></p>
   </section>
 </main>
@@ -229,6 +240,7 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
 <nav class="tabs">
   <button data-tab="cal"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>Agenda</button>
   <button data-tab="list" class="on"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>Contrats</button>
+  <button data-tab="tar"><svg viewBox="0 0 24 24"><path d="M4 12V5a1 1 0 0 1 1-1h7l8 8-8 8z"/><circle cx="8.5" cy="8.5" r="1.3"/></svg>Tarifs</button>
 </nav>
 
 <div class="sheet" id="sheet"><div class="in">
@@ -244,6 +256,8 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
 <script src="assets.js"></script>
 <script src="contrat-pdf.js"></script>
 <script src="agenda.js"></script>
+<script src="sync.js"></script>
+<script src="tarifs.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

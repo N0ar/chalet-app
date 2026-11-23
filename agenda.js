@@ -26,7 +26,7 @@
     set(v) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } }
   };
 
-  let data = null, month = null, picked = null, busy = false, error = '', hub = '', goSettings = () => {}, link = () => null;
+  let data = null, month = null, picked = null, busy = false, error = '', hub = '', goSettings = () => {}, link = () => null, price = () => '';
 
   // Accepte l'adresse du hub seule ou une adresse de flux complète collée par erreur.
   const base = (u) => String(u || '').trim().replace(/\/feed\/.*$/, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
@@ -51,8 +51,8 @@
     busy = false; render();
   }
 
-  function open(hubUrl, onSettings, linkFor) {
-    hub = hubUrl; goSettings = onSettings || goSettings; link = linkFor || link;
+  function open(hubUrl, onSettings, linkFor, priceFor) {
+    hub = hubUrl; goSettings = onSettings || goSettings; link = linkFor || link; price = priceFor || price;
     if (!data) data = cache.get();
     if (!month) { const n = new Date(); month = new Date(n.getFullYear(), n.getMonth(), 1, 12); }
     render();
@@ -128,8 +128,10 @@
     if (picked) {
       root.append(el('h2', null, cap(fmt(picked, { weekday: 'long', day: 'numeric', month: 'long' }))));
       const hit = ev.filter((e) => e.start <= picked && picked <= e.end);
+      const free = !ev.some((e) => e.start <= picked && picked < e.end), pt = picked >= today ? price(picked) : '';
       if (!hit.length) root.append(el('div', 'cal-free', 'Chalet libre ce jour-là.'));
       hit.forEach((e) => root.append(row(e, e.start === picked ? 'Arrivée' : e.end === picked ? 'Départ' : 'Occupé')));
+      if (free && pt) root.append(el('div', 'cal-free', pt));
     }
 
     // Prochaines arrivées et départs
