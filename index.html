@@ -73,6 +73,32 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
 .sig button{ border:1px solid var(--line); background:var(--card); border-radius:9px; padding:8px 12px; font:inherit; font-size:14px; color:var(--lake); font-weight:600; }
 .toast{ position:fixed; left:50%; bottom:calc(84px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 16px; border-radius:22px; font-size:14px; z-index:30; opacity:0; transition:opacity .2s; pointer-events:none; white-space:nowrap; }
 .toast.on{ opacity:1; }
+.cal-status{ display:flex; align-items:center; justify-content:space-between; color:var(--mute); font-size:13px; margin:0 4px 10px; }
+.cal-status button{ border:1px solid var(--line); background:var(--card); border-radius:9px; padding:7px 12px; font:inherit; font-size:14px; color:var(--lake); font-weight:600; }
+.cal-status button:disabled{ opacity:.5; }
+.warn{ background:#fff4d6; color:#7a5a06; border-radius:12px; padding:10px 14px; font-size:14px; margin-bottom:10px; }
+#cal .err{ margin:0 0 10px; }
+.cal-card{ background:var(--card); border-radius:14px; padding:10px 10px 12px; box-shadow:0 1px 2px rgba(28,43,48,.06); }
+.cal-head{ display:flex; align-items:center; justify-content:space-between; padding:2px 2px 8px; }
+.cal-head b{ font-size:17px; }
+.cal-head button{ border:0; background:var(--lake2); color:var(--lake); width:40px; height:40px; border-radius:50%; font-size:24px; line-height:1; padding:0 0 3px; }
+.cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); row-gap:4px; touch-action:pan-y; }
+.cal-grid .dow{ text-align:center; font-size:11px; font-weight:650; color:var(--mute); padding-bottom:4px; }
+.cal-grid .day{ position:relative; border:0; background:transparent; height:44px; padding:0; font:inherit; font-size:15px; color:var(--ink); font-variant-numeric:tabular-nums; display:flex; align-items:center; justify-content:center; }
+.cal-grid .day.past span{ opacity:.45; }
+.cal-grid .day.today span{ box-shadow:0 0 0 2px var(--lake); border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-weight:700; }
+.cal-grid .day.sel span{ background:var(--lake); color:#fff; border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; opacity:1; }
+.cal-grid .day .dot{ position:absolute; top:4px; right:6px; width:7px; height:7px; border-radius:50%; background:var(--bad); }
+.legend{ display:flex; flex-wrap:wrap; gap:6px 14px; padding:12px 4px 0; font-size:12px; color:var(--mute); }
+.legend span{ display:flex; align-items:center; gap:6px; }
+.legend i{ width:14px; height:14px; border-radius:4px; border:1.5px solid; }
+.stay{ display:flex; align-items:center; gap:10px; background:var(--card); border-radius:12px; border-left:5px solid; padding:11px 12px; margin-bottom:8px; box-shadow:0 1px 2px rgba(28,43,48,.06); }
+.stay .n{ flex:1; min-width:0; }
+.stay .n b{ display:block; font-size:15px; }
+.stay .n span{ display:block; color:var(--mute); font-size:13px; }
+.stay .n .turn{ color:var(--wood); font-weight:600; }
+.stay em{ font-style:normal; font-size:12px; font-weight:650; color:var(--lake); background:var(--lake2); border-radius:20px; padding:4px 9px; white-space:nowrap; }
+.cal-free{ color:var(--mute); font-size:14px; padding:4px 4px 8px; }
 </style>
 </head>
 <body>
@@ -131,6 +157,9 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
     </form>
   </section>
 
+  <!-- Agenda -->
+  <section class="view" id="v-cal"><div id="cal"></div></section>
+
   <!-- Réglages -->
   <section class="view" id="v-set">
     <h2>Bailleur</h2>
@@ -164,6 +193,12 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
       <div class="f"><label>Recharge électrique<small>par kWh</small></label><input inputmode="decimal" data-s="kwh"><span class="u">€</span></div>
       <div class="f col"><label>Site web</label><input data-s="site" autocapitalize="off"></div>
     </div>
+    <h2>Agenda</h2>
+    <div class="card">
+      <div class="f col"><label>Adresse du hub de calendriers</label><input data-s="hubUrl" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://…"></div>
+      <div class="f col"><label for="tok">Jeton d’accès</label><input id="tok" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Collez le jeton ici"></div>
+    </div>
+    <p class="note">Le jeton reste sur cet appareil. Il n’est ni envoyé ailleurs qu’au hub, ni inclus dans les sauvegardes.</p>
     <h2>Sauvegarde</h2>
     <button class="btn sec" type="button" id="expBtn">Exporter une sauvegarde</button>
     <button class="btn sec" type="button" id="impBtn">Importer une sauvegarde ou des réglages</button>
@@ -176,6 +211,7 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
 <nav class="tabs">
   <button data-tab="list" class="on"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>Contrats</button>
   <button data-tab="form"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Nouveau</button>
+  <button data-tab="cal"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>Agenda</button>
   <button data-tab="set"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Réglages</button>
 </nav>
 
@@ -191,6 +227,7 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
 <script src="vendor/vfs_fonts.js"></script>
 <script src="assets.js"></script>
 <script src="contrat-pdf.js"></script>
+<script src="agenda.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

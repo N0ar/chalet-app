@@ -1,6 +1,6 @@
 /* Le Chalet Sciez — application de contrats. Tout est stocké sur l'appareil (localStorage). */
 (function () {
-  const VERSION = '1.0';
+  const VERSION = '1.1';
   const $ = (q) => document.querySelector(q), $$ = (q) => Array.from(document.querySelectorAll(q));
   const { compute, check, build, fileName, eur, dmy, num } = window.Contrat;
 
@@ -8,7 +8,7 @@
   const DEF = {
     bailleur: { nom: '', adresse1: '', adresse2: '', tel: '', email1: '', email2: '', initiales: '' }, signature: '',
     prixNuit: 230, basePers: 6, suppPers: 10, capacite: 8, menage: 100, arrhesPct: 30, depot: 1500,
-    heureArrivee: '15 h', heureDepart: '11 h', annulJours: 21, delaiRetour: 7, tabac: 150, kwh: 0.2, site: 'www.lechaletsciez.fr'
+    heureArrivee: '15 h', heureDepart: '11 h', annulJours: 21, delaiRetour: 7, tabac: 150, kwh: 0.2, site: 'www.lechaletsciez.fr', hubUrl: ''
   };
   const mem = {};
   const store = {
@@ -32,10 +32,11 @@
   function show(tab) {
     $$('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + tab));
     $$('nav.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-    $('#title').textContent = tab === 'list' ? 'Contrats' : tab === 'set' ? 'Réglages' : (contracts.some((c) => c.id === cur.id) ? 'Modifier le contrat' : 'Nouveau contrat');
+    $('#title').textContent = tab === 'list' ? 'Contrats' : tab === 'set' ? 'Réglages' : tab === 'cal' ? 'Agenda' : (contracts.some((c) => c.id === cur.id) ? 'Modifier le contrat' : 'Nouveau contrat');
     window.scrollTo(0, 0);
     if (tab === 'list') renderList();
     if (tab === 'set') renderSettings();
+    if (tab === 'cal') window.Agenda.open(S.hubUrl, () => show('set'));
   }
   $$('nav.tabs button').forEach((b) => b.addEventListener('click', () => { if (b.dataset.tab === 'form') openForm(blank()); else show(b.dataset.tab); }));
   $('#newBtn').addEventListener('click', () => openForm(blank()));
@@ -135,11 +136,13 @@
   // ---------- réglages ----------
   function renderSettings() {
     $$('#v-set [data-s]').forEach((i) => { const v = getP(S, i.dataset.s); i.value = v == null ? '' : String(v).replace('.', i.inputMode === 'decimal' ? ',' : '.'); });
+    $('#tok').value = window.Agenda.token.get();
     const has = !!S.signature; $('#sigImg').hidden = !has; if (has) $('#sigImg').src = S.signature;
     $('#sigTxt').textContent = has ? 'Signature enregistrée' : 'Aucune signature';
     $('#ver').textContent = 'Version ' + VERSION + ' · ' + contracts.length + ' contrat' + (contracts.length > 1 ? 's' : '') + ' sur cet appareil';
   }
-  $('#v-set').addEventListener('input', (e) => { const i = e.target; if (!i.dataset.s) return; setP(S, i.dataset.s, i.value); store.set('chalet.settings', S); });
+  $('#v-set').addEventListener('input', (e) => { const i = e.target; if (!i.dataset.s) return; setP(S, i.dataset.s, i.value); store.set('chalet.settings', S); if (i.dataset.s === 'hubUrl') window.Agenda.reset(); });
+  $('#tok').addEventListener('input', (e) => { window.Agenda.token.set(e.target.value.trim()); window.Agenda.reset(); });
   $('#sigBtn').addEventListener('click', () => $('#sigFile').click());
   $('#sigFile').addEventListener('change', (e) => {
     const f = e.target.files[0]; if (!f) return;
