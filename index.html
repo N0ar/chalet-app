@@ -130,6 +130,7 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
   <section class="view on" id="v-list">
     <div id="list" class="list"></div>
     <button class="btn" id="newBtn">Nouveau contrat</button>
+    <p class="note" id="cNote"></p>
   </section>
 
   <!-- Formulaire -->
@@ -226,13 +227,14 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
     <div class="card">
       <div class="f col"><label>Adresse du hub</label><input data-s="hubUrl" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://…"></div>
       <div class="f col"><label for="tok">Jeton de l’application</label><input id="tok" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Collez le jeton ici"></div>
+      <div class="f col"><label for="pass">Phrase secrète des contrats (8 caractères au moins)</label><input id="pass" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="La même sur chaque appareil"></div>
     </div>
-    <p class="note">Le jeton reste sur cet appareil. Il n’est ni envoyé ailleurs qu’au hub, ni inclus dans les sauvegardes. Les tarifs et le suivi des séjours (dates et points cochés, sans nom) sont partagés via le hub entre vos appareils.</p>
+    <p class="note">Le jeton reste sur cet appareil. Il n’est ni envoyé ailleurs qu’au hub, ni inclus dans les sauvegardes. Les tarifs et le suivi des séjours (dates et points cochés, sans nom) sont partagés via le hub entre vos appareils. Les contrats le sont aussi si vous indiquez une phrase secrète : ils sont chiffrés sur cet appareil avant l’envoi, et le hub ne peut pas les lire. La phrase secrète reste sur cet appareil et n’est pas incluse dans les sauvegardes.</p>
     <h2>Sauvegarde</h2>
     <button class="btn sec" type="button" id="expBtn">Exporter une sauvegarde</button>
     <button class="btn sec" type="button" id="impBtn">Importer une sauvegarde ou des réglages</button>
     <input type="file" id="impFile" accept="application/json,.json" hidden>
-    <p class="note">Les contrats et les coordonnées des locataires sont enregistrés uniquement sur cet appareil. Pensez à exporter une sauvegarde de temps en temps, et à supprimer les contrats dont vous n’avez plus besoin.</p>
+    <p class="note">Sans phrase secrète, les contrats et les coordonnées des locataires restent uniquement sur cet appareil. Pensez à exporter une sauvegarde de temps en temps, et à supprimer les contrats dont vous n’avez plus besoin.</p>
     <p class="note" id="ver"></p>
   </section>
 </main>
@@ -256,6 +258,7 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
 <script src="assets.js"></script>
 <script src="contrat-pdf.js"></script>
 <script src="agenda.js"></script>
+<script src="coffre.js"></script>
 <script src="sync.js"></script>
 <script src="tarifs.js"></script>
 <script src="app.js"></script>

@@ -1,6 +1,6 @@
 /* Le Chalet Sciez — application de contrats. Tout est stocké sur l'appareil (localStorage). */
 (function () {
-  const VERSION = '1.3';
+  const VERSION = '1.4';
   const $ = (q) => document.querySelector(q), $$ = (q) => Array.from(document.querySelectorAll(q));
   const { compute, check, build, fileName, eur, dmy, num } = window.Contrat;
 
@@ -107,6 +107,43 @@
     if (up.length) window.Hub.change((d) => up.forEach((c) => { d.suivi[skey(c)] = { pts: Object.assign({}, c.suivi), maj: new Date().toISOString() }; }));
     return ch;
   }
+  // ---------- contrats partagés, chiffrés avec la phrase secrète ----------
+  let cBusy = false, cAgain = false, cState = 'local';
+  const stamp = () => new Date().toISOString();
+  function noteC() {
+    $('#cNote').textContent = cState === 'ok' ? 'Contrats partagés via le hub, chiffrés avec votre phrase secrète.'
+      : cState === 'bad' ? 'Des contrats du hub ne peuvent pas être lus : la phrase secrète n’est pas la même sur tous les appareils. Corrigez-la dans les Réglages.'
+      : 'Contrats enregistrés sur cet appareil seulement. Pour les partager, indiquez une phrase secrète dans les Réglages.';
+    $('#cNote').style.color = cState === 'bad' ? 'var(--bad)' : '';
+  }
+  async function syncContracts() {
+    if (!window.Coffre.ready()) { cState = 'local'; noteC(); return; }
+    if (cBusy) { cAgain = true; return; }
+    cBusy = true; let changed = false; const up = {};
+    try {
+      const items = window.Hub.data().contrats.items;
+      for (const id of Object.keys(items)) { // du hub vers l'appareil : la version la plus récente l'emporte
+        const it = items[id], i = contracts.findIndex((x) => x.id === id), loc = i >= 0 ? contracts[i] : null;
+        if (!it || (loc && (loc.maj || '') >= String(it.maj || ''))) continue;
+        if (it.del) { if (loc) { contracts.splice(i, 1); changed = true; } continue; }
+        const c = await window.Coffre.dec(it); if (!c || !c.loc) continue;
+        c.id = id; c.maj = it.maj; c.suivi = loc ? loc.suivi : {};
+        if (loc) contracts[i] = c; else contracts.push(c); changed = true;
+      }
+      for (const c of contracts) { // de l'appareil vers le hub
+        const it = items[c.id]; if (it && String(it.maj || '') >= (c.maj || '')) continue;
+        if (!c.maj) { c.maj = stamp(); changed = true; }
+        const plain = Object.assign({}, c); delete plain.suivi;
+        up[c.id] = Object.assign({ maj: c.maj }, await window.Coffre.enc(plain));
+      }
+      cState = 'ok';
+    } catch (e) { cState = 'bad'; }
+    if (changed) { store.set('chalet.contracts', contracts); reconcile(); }
+    cBusy = false; noteC();
+    if (cState === 'ok' && Object.keys(up).length) window.Hub.change((d) => Object.assign(d.contrats.items, up));
+    if (changed && $('#v-list').classList.contains('on')) renderList();
+    if (cAgain) { cAgain = false; syncContracts(); }
+  }
   // Prix par nuit proposé d'après la grille de tarifs (moyenne des nuits du séjour), tant qu'il n'a pas été saisi à la main.
   function applyPrix() {
     if (!autoPrix) return; const v = window.Tarifs.avg(cur.arrivee, cur.depart); if (v == null) return;
@@ -159,9 +196,10 @@
   });
   function save() {
     const i = contracts.findIndex((x) => x.id === cur.id);
+    cur.maj = stamp();
     const copy = JSON.parse(JSON.stringify(cur));
     if (i >= 0) contracts[i] = copy; else contracts.push(copy);
-    store.set('chalet.contracts', contracts); $('#delBtn').hidden = false; if (copy.suivi && Object.keys(copy.suivi).length) shareSuivi(copy); renderSuivi();
+    store.set('chalet.contracts', contracts); $('#delBtn').hidden = false; if (copy.suivi && Object.keys(copy.suivi).length) shareSuivi(copy); renderSuivi(); syncContracts();
   }
   $('#genBtn').addEventListener('click', () => {
     const errs = check(cur, S), box = $('#err');
@@ -178,7 +216,8 @@
   });
   $('#delBtn').addEventListener('click', () => {
     if (!window.confirm('Supprimer définitivement ce contrat de l’appareil ?')) return;
-    contracts = contracts.filter((x) => x.id !== cur.id); store.set('chalet.contracts', contracts); toast('Contrat supprimé'); show('list');
+    const gone = cur.id; contracts = contracts.filter((x) => x.id !== gone); store.set('chalet.contracts', contracts);
+    if (window.Hub.data().contrats.items[gone] || window.Coffre.ready()) window.Hub.change((d) => { d.contrats.items[gone] = { maj: stamp(), del: true }; }); toast('Contrat supprimé'); show('list');
   });
 
   // ---------- partage du PDF ----------
@@ -197,14 +236,15 @@
   // ---------- réglages ----------
   function renderSettings() {
     $$('#v-set [data-s]').forEach((i) => { const v = getP(S, i.dataset.s); i.value = v == null ? '' : String(v).replace('.', i.inputMode === 'decimal' ? ',' : '.'); });
-    $('#tok').value = window.Agenda.token.get();
+    $('#tok').value = window.Agenda.token.get(); $('#pass').value = window.Coffre.pass.get();
     const has = !!S.signature; $('#sigImg').hidden = !has; if (has) $('#sigImg').src = S.signature;
     $('#sigTxt').textContent = has ? 'Signature enregistrée' : 'Aucune signature';
     $('#ver').textContent = 'Version ' + VERSION + ' · ' + contracts.length + ' contrat' + (contracts.length > 1 ? 's' : '') + ' sur cet appareil';
   }
   $('#v-set').addEventListener('input', (e) => { const i = e.target; if (!i.dataset.s) return; setP(S, i.dataset.s, i.value); store.set('chalet.settings', S); if (i.dataset.s === 'hubUrl') { window.Agenda.reset(); window.Hub.init(S.hubUrl); } });
   $('#tok').addEventListener('input', (e) => { window.Agenda.token.set(e.target.value.trim()); window.Agenda.reset(); });
-  $('#topBtn').addEventListener('click', () => window.Hub.sync());
+  $('#pass').addEventListener('input', (e) => window.Coffre.pass.set(e.target.value));
+  $('#topBtn').addEventListener('click', () => { if (window.Hub.ready) window.Hub.sync(); else syncContracts(); });
   $('#sigBtn').addEventListener('click', () => $('#sigFile').click());
   $('#sigFile').addEventListener('change', (e) => {
     const f = e.target.files[0]; if (!f) return;
@@ -229,7 +269,7 @@
       S = merge(merge(DEF, S), j.settings); store.set('chalet.settings', S);
       let n = 0;
       if (Array.isArray(j.contracts)) j.contracts.forEach((c) => { if (c && c.id && c.loc && !contracts.some((x) => x.id === c.id)) { contracts.push(c); n++; } });
-      store.set('chalet.contracts', contracts); renderSettings(); window.Hub.init(S.hubUrl);
+      store.set('chalet.contracts', contracts); renderSettings(); window.Hub.init(S.hubUrl); syncContracts();
       toast(n ? 'Réglages et ' + n + ' contrat' + (n > 1 ? 's' : '') + ' importés' : 'Réglages importés');
     } catch (err) { toast('Ce fichier n’est pas une sauvegarde valide'); }
   });
@@ -237,7 +277,8 @@
   // ---------- démarrage ----------
   $('#logo').src = window.ASSETS.logo;
   window.Hub.init(S.hubUrl);
-  window.Hub.on(() => { if (reconcile() && $('#v-list').classList.contains('on')) renderList(); });
+  window.Hub.on(() => { if (reconcile() && $('#v-list').classList.contains('on')) renderList(); if (!window.Hub.busy) syncContracts(); });
+  noteC();
   cur = blank(); show('list');
   if (window.Hub.ready) window.Hub.sync();
   document.addEventListener('visibilitychange', () => { if (!document.hidden && window.Hub.ready) window.Hub.sync(); });

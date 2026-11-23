@@ -1,4 +1,4 @@
-/* Données partagées via le hub (tarifs et suivi des séjours, sans nom ni coordonnées de voyageur).
+/* Données partagées via le hub : tarifs, suivi des séjours (par dates, sans nom) et contrats chiffrés sur l'appareil.
    Une copie reste sur l'appareil : l'app fonctionne hors ligne et envoie les modifications dès que possible. */
 (function () {
   const KEY = 'chalet.shared';
@@ -11,15 +11,17 @@
 
   const base = (u) => String(u || '').trim().replace(/\/(feed|data)\/.*$/, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
   const url = () => { const b = base(hub), t = window.Agenda.token.get(); return b && t ? b + '/data/app.json?key=' + encodeURIComponent(t) : ''; };
-  const shape = (d) => { d = d && typeof d === 'object' && !Array.isArray(d) ? d : {}; if (!d.suivi || typeof d.suivi !== 'object') d.suivi = {}; return d; };
+  const shape = (d) => { d = d && typeof d === 'object' && !Array.isArray(d) ? d : {}; if (!d.suivi || typeof d.suivi !== 'object') d.suivi = {};
+    if (!d.contrats || typeof d.contrats !== 'object') d.contrats = {}; if (!d.contrats.items || typeof d.contrats.items !== 'object') d.contrats.items = {}; return d; };
   // Fusion : pour les tarifs comme pour chaque séjour suivi, la modification la plus récente l'emporte.
   const newer = (a, b) => (!a ? b : !b ? a : String(a.maj || '') >= String(b.maj || '') ? a : b);
   function merge(loc, rem) {
     loc = shape(loc); rem = shape(rem);
     const o = Object.assign({}, rem, loc), t = newer(loc.tarifs, rem.tarifs);
     if (t) o.tarifs = t;
-    o.suivi = {};
-    Object.keys(Object.assign({}, rem.suivi, loc.suivi)).forEach((k) => { o.suivi[k] = newer(loc.suivi[k], rem.suivi[k]); });
+    const each = (a, b) => { const m = {}; Object.keys(Object.assign({}, b, a)).forEach((k) => { m[k] = newer(a[k], b[k]); }); return m; };
+    o.suivi = each(loc.suivi, rem.suivi);
+    o.contrats = { items: each(loc.contrats.items, rem.contrats.items) }; // contrats chiffrés, un bloc par contrat
     return o;
   }
   const fail = (s) => new Error(s === 403 ? 'Le jeton a été refusé. Le partage demande le jeton de l’application (Réglages).'
