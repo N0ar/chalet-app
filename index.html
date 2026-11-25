@@ -60,6 +60,7 @@ h2{ font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--
 .list .p{ font-weight:650; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; }
 .list .p small{ display:block; font-weight:650; font-size:11px; color:var(--lake); background:var(--lake2); border-radius:20px; padding:2px 8px; margin-top:4px; }
 .list .p small.ok{ color:#2c6b43; background:#dcefe2; }
+.f input[type=checkbox]{ flex:none; width:22px; height:22px; margin:0 0 0 auto; accent-color:var(--lake); -webkit-appearance:auto; appearance:auto; }
 .chk{ display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); font-size:15px; min-height:48px; }
 .chk:last-child{ border-bottom:0; }
 .chk input{ width:22px; height:22px; flex:none; margin:0; accent-color:var(--lake); }
@@ -178,6 +179,7 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
 
       <h2>Récapitulatif</h2>
       <div class="sum" id="sum"></div>
+      <div class="warn" id="rule" hidden style="margin-top:14px"></div>
       <div class="err" id="err" hidden></div>
       <button class="btn" type="button" id="genBtn">Créer le contrat PDF</button>
       <button class="btn dan" type="button" id="delBtn" hidden>Supprimer ce contrat</button>
@@ -209,7 +211,10 @@ nav.tabs button.on{ color:var(--lake); font-weight:650; }
       <div class="f"><label>Tarif de base jusqu’à</label><input inputmode="numeric" data-s="basePers"><span class="u">pers.</span></div>
       <div class="f"><label>Personne en plus<small>par nuit</small></label><input inputmode="decimal" data-s="suppPers"><span class="u">€</span></div>
       <div class="f"><label>Capacité maximale</label><input inputmode="numeric" data-s="capacite"><span class="u">pers.</span></div>
-      <div class="f"><label>Ménage et linge</label><input inputmode="decimal" data-s="menage"><span class="u">€</span></div>
+      <div class="f"><label>Ménage et linge<small>à partir de <span id="seuilLbl">5</span> nuits</small></label><input inputmode="decimal" data-s="menage"><span class="u">€</span></div>
+      <div class="f"><label>Ménage court séjour<small>séjours plus courts</small></label><input inputmode="decimal" data-s="menageCourt"><span class="u">€</span></div>
+      <div class="f"><label>Ménage complet dès</label><input inputmode="numeric" data-s="menageSeuil"><span class="u">nuits</span></div>
+      <div class="f"><label>Animal<small>par animal et par séjour</small></label><input inputmode="decimal" data-s="animalTarif"><span class="u">€</span></div>
       <div class="f"><label>Arrhes</label><input inputmode="decimal" data-s="arrhesPct"><span class="u">%</span></div>
       <div class="f"><label>Dépôt de garantie</label><input inputmode="decimal" data-s="depot"><span class="u">€</span></div>
     </div>
