@@ -15,7 +15,7 @@
   let defBase = 230, view = 'list', month = null, picked = null;
   const get = () => {
     const t = window.Hub.data().tarifs || {};
-    return { base: num(t.base) || defBase, frais: Object.assign({}, FRAIS, t.frais || {}), periodes: Array.isArray(t.periodes) ? t.periodes : [] };
+    return { base: num(t.base) || defBase, min: Math.round(num(t.min)) || 2, frais: Object.assign({}, FRAIS, t.frais || {}), periodes: Array.isArray(t.periodes) ? t.periodes : [] };
   };
   const set = (fn) => window.Hub.change((d) => { const t = get(); fn(t); t.maj = new Date().toISOString(); d.tarifs = t; });
 
@@ -30,12 +30,29 @@
     for (let D = arr; D < dep && n < 400; D = add(D, 1)) { s += net(D, t); n++; }
     return Math.round((s / n) * 100) / 100;
   }
-  function nightText(D) { const t = get(), p = periodFor(D, t), n = net(D, t); return 'Nuit à ' + eur(n) + ' net' + (p && p.nom ? ' (' + p.nom + ')' : '') + ' · ' + platTxt(n, t); }
+  // Règles de durée : nuits minimum (par période, sinon règle générale) et périodes louées du samedi au samedi.
+  const DOW = (s) => date(s).getDay();
+  const minTxt = (p) => [num(p.min) > 0 ? Math.round(num(p.min)) + ' nuits min.' : '', p.sam ? 'du samedi au samedi' : ''].filter(Boolean).join(', ');
+  function rules(arr, dep) {
+    if (!arr || !dep || dep <= arr) return [];
+    const t = get(), seen = [], out = []; let n = 0;
+    for (let D = arr; D < dep && n < 400; D = add(D, 1)) { n++; const p = periodFor(D, t); if (p && seen.indexOf(p) < 0) seen.push(p); }
+    const strict = seen.filter((p) => num(p.min) > 0 || p.sam);
+    strict.forEach((p) => {
+      const nom = p.nom || 'cette période';
+      if (num(p.min) > n) out.push(nom + ' : ' + Math.round(num(p.min)) + ' nuits minimum (séjour de ' + n + ' nuit' + (n > 1 ? 's' : '') + ').');
+      if (p.sam && (DOW(arr) !== 6 || DOW(dep) !== 6)) out.push(nom + ' : location du samedi au samedi.');
+    });
+    if (!strict.length && n < t.min) out.push(t.min + ' nuits minimum en dehors des périodes à la semaine (séjour de ' + n + ' nuit' + (n > 1 ? 's' : '') + ').');
+    if (out.length) out.push('Le contrat peut tout de même être créé si vous acceptez cette exception.');
+    return out;
+  }
+  function nightText(D) { const t = get(), p = periodFor(D, t), n = net(D, t); return 'Nuit à ' + eur(n) + ' net' + (p && (p.nom || minTxt(p)) ? ' (' + [p.nom, minTxt(p)].filter(Boolean).join(', ') + ')' : '') + ' · ' + platTxt(n, t); }
 
   // ---------- fiche d'une période ----------
   let sheet = null;
   function edit(p) {
-    const isNew = !p; p = p || { id: 'p' + Date.now(), nom: '', du: '', au: '', net: '' };
+    const isNew = !p; p = p || { id: 'p' + Date.now(), nom: '', du: '', au: '', net: '', min: '', sam: false };
     if (sheet) sheet.remove();
     sheet = el('div', 'sheet on'); const box = el('div', 'in'); sheet.append(box);
     box.append(el('h3', null, isNew ? 'Nouvelle période' : 'Modifier la période'));
@@ -46,12 +63,15 @@
     const au = field('Dernière nuit', 'date', p.au, { id: 'pAu' });
     const pn = field('Prix net par nuit', 'text', p.net, { inputMode: 'decimal', id: 'pNet' });
     pn.parentNode.append(el('span', 'u', '€'));
+    const pm = field('Nuits minimum', 'text', p.min || '', { inputMode: 'numeric', id: 'pMin', placeholder: String(get().min) });
+    const ps = field('Du samedi au samedi', 'checkbox', '', { id: 'pSam', checked: !!p.sam });
     const err = el('div', 'err'); err.hidden = true;
     const ok = el('button', 'btn', 'Enregistrer'), del = el('button', 'btn dan', 'Supprimer cette période'), no = el('button', 'btn sec', 'Annuler');
     [ok, del, no].forEach((b) => { b.type = 'button'; }); ok.id = 'pOk'; del.id = 'pDel';
     const close = () => { sheet.remove(); sheet = null; render(); };
     ok.addEventListener('click', () => {
       const v = { id: p.id, nom: nom.value.trim(), du: du.value, au: au.value, net: num(pn.value) };
+      if (Math.round(num(pm.value)) > 0) v.min = Math.round(num(pm.value)); if (ps.checked) v.sam = true;
       const m = !v.du || !v.au ? 'Indiquez la première et la dernière nuit.' : v.au < v.du ? 'La dernière nuit doit être après la première.' : v.net <= 0 ? 'Indiquez le prix net par nuit.' : '';
       if (m) { err.textContent = m; err.hidden = false; return; }
       set((t) => { const i = t.periodes.findIndex((x) => x.id === v.id); if (i >= 0) t.periodes[i] = v; else t.periodes.push(v); });
@@ -78,7 +98,11 @@
     const c1 = el('div', 'card'), f1 = el('div', 'f'), l1 = el('label', null, 'Prix net par nuit'); l1.append(el('small', null, 'hors périodes'));
     const i1 = el('input'); i1.inputMode = 'decimal'; i1.id = 'tBase'; i1.value = String(t.base).replace('.', ',');
     i1.addEventListener('change', () => { const v = num(i1.value); if (v === get().base) return; if (v > 0) set((x) => { x.base = v; }); else render(); });
-    f1.append(l1, i1, el('span', 'u', '€')); c1.append(f1); root.append(c1, el('p', 'note', platTxt(t.base, t)));
+    f1.append(l1, i1, el('span', 'u', '€')); c1.append(f1);
+    const f0 = el('div', 'f'), l0 = el('label', null, 'Nuits minimum'); l0.append(el('small', null, 'hors périodes, sous réserve de votre accord'));
+    const i0 = el('input'); i0.inputMode = 'numeric'; i0.id = 'tMin'; i0.value = String(t.min);
+    i0.addEventListener('change', () => { const v = Math.round(num(i0.value)); if (v === get().min) return; if (v > 0) set((x) => { x.min = v; }); else render(); });
+    f0.append(l0, i0, el('span', 'u', 'nuits')); c1.append(f0); root.append(c1, el('p', 'note', platTxt(t.base, t)));
 
     root.append(el('h2', null, 'Périodes'));
     const ps = t.periodes.slice().sort((a, b) => a.du.localeCompare(b.du));
@@ -87,6 +111,8 @@
       const a = el('div', 'stay tap' + (p.au < today ? ' old' : '')); a.style.borderLeftColor = 'var(--wood)';
       const box = el('div', 'n'), n = Math.round((date(p.au) - date(p.du)) / 864e5) + 1;
       box.append(el('b', null, p.nom || 'Période sans nom'), el('span', null, cap(dayTxt(p.du)) + ' → ' + dayTxt(p.au) + ' · ' + n + ' nuit' + (n > 1 ? 's' : '')), el('span', null, platTxt(num(p.net), t)));
+      if (minTxt(p)) box.append(el('span', null, cap(minTxt(p))));
+      if (p.sam && (DOW(p.du) !== 6 || DOW(add(p.au, 1)) !== 6)) box.append(el('span', 'turn', 'Ne va pas d’un samedi au samedi'));
       const over = ps.filter((o) => o !== p && o.du <= p.au && p.du <= o.au && o.du >= p.du);
       if (over.length) box.append(el('span', 'turn', 'Sauf les nuits de : ' + over.map((o) => o.nom || 'période sans nom').join(', ')));
       a.append(box, el('em', null, eur(num(p.net)))); a.addEventListener('click', () => edit(p)); root.append(a);
@@ -147,5 +173,5 @@
     clearTimeout(later);
     later = setTimeout(() => { const f = document.activeElement; if (v.classList.contains('on') && !sheet && !(f && f.tagName === 'INPUT' && v.contains(f))) render(); }, 350);
   });
-  window.Tarifs = { open(base) { defBase = num(base) || defBase; render(); }, avg, nightText };
+  window.Tarifs = { open(base) { defBase = num(base) || defBase; render(); }, avg, nightText, rules };
 })();

@@ -1,13 +1,13 @@
 /* Le Chalet Sciez — application de contrats. Tout est stocké sur l'appareil (localStorage). */
 (function () {
-  const VERSION = '1.5';
+  const VERSION = '1.6';
   const $ = (q) => document.querySelector(q), $$ = (q) => Array.from(document.querySelectorAll(q));
   const { compute, check, build, fileName, eur, dmy, num } = window.Contrat;
 
   // ---------- stockage ----------
   const DEF = {
     bailleur: { nom: '', adresse1: '', adresse2: '', tel: '', email1: '', email2: '', initiales: '' }, signature: '',
-    prixNuit: 230, basePers: 6, suppPers: 10, capacite: 8, menage: 100, arrhesPct: 30, depot: 1500,
+    prixNuit: 230, basePers: 6, suppPers: 10, capacite: 8, menage: 100, menageCourt: 70, menageSeuil: 5, animalTarif: 20, arrhesPct: 30, depot: 1500,
     heureArrivee: '15 h', heureDepart: '11 h', annulJours: 21, delaiRetour: 7, tabac: 150, kwh: 0.2, site: 'www.lechaletsciez.fr', hubUrl: ''
   };
   const mem = {};
@@ -18,7 +18,7 @@
   const merge = (a, b) => { const o = Object.assign({}, a, b || {}); o.bailleur = Object.assign({}, a.bailleur, (b || {}).bailleur || {}); return o; };
   let S = merge(DEF, store.get('chalet.settings', {}));
   let contracts = store.get('chalet.contracts', []);
-  let cur = null, blob = null, back = 'list', autoPrix = false;
+  let cur = null, blob = null, back = 'list', autoPrix = false, autoMenage = false, autoAnimaux = false;
 
   // Points de suivi d'un séjour direct. La valeur enregistrée est la date à laquelle le point a été coché.
   const STEPS = [['envoye', 'Contrat envoyé'], ['signe', 'Contrat signé reçu'], ['arrhes', 'Arrhes reçues'], ['assurance', 'Attestation d’assurance reçue'],
@@ -87,11 +87,11 @@
 
   // ---------- formulaire ----------
   function openForm(c) {
-    cur = c; blob = null; autoPrix = !contracts.some((x) => x.id === c.id);
+    cur = c; blob = null; autoPrix = autoMenage = autoAnimaux = !contracts.some((x) => x.id === c.id);
     $$('#form [data-k]').forEach((i) => { const v = getP(cur, i.dataset.k); i.value = v == null ? '' : v; });
     $('#delBtn').hidden = !contracts.some((x) => x.id === cur.id);
     $('#err').hidden = true;
-    applyPrix(); refresh(); renderSuivi(); show('form');
+    applyPrix(); applyAuto(); refresh(); showRule(); renderSuivi(); show('form');
   }
   // Le suivi est partagé via le hub sous la seule clé des dates du séjour : ni nom ni coordonnées.
   const skey = (c) => (c.arrivee && c.depart ? c.arrivee + '_' + c.depart : '');
@@ -162,6 +162,18 @@
     if (!autoPrix) return; const v = window.Tarifs.avg(cur.arrivee, cur.depart); if (v == null) return;
     cur.prixNuit = v; $('#prixNuit').value = String(v).replace('.', ',');
   }
+  // Ménage (court séjour ou semaine) et supplément animaux proposés d'après les réglages, tant qu'ils n'ont pas été saisis à la main.
+  function applyAuto() {
+    const k = compute(cur);
+    if (autoMenage && k.nuits > 0) { cur.menage = k.nuits >= num(S.menageSeuil) ? S.menage : S.menageCourt; $('#menage').value = String(cur.menage).replace('.', ','); }
+    if (autoAnimaux) { cur.suppAnimaux = Math.max(0, Math.round(num(cur.animaux))) * num(S.animalTarif); $('#suppAnimaux').value = String(cur.suppAnimaux).replace('.', ','); }
+  }
+  // Rappel des règles de durée (nuits minimum, samedi au samedi). Il n'empêche pas de créer le contrat : les hôtes peuvent valider une exception.
+  function showRule() {
+    const m = window.Tarifs.rules(cur.arrivee, cur.depart), box = $('#rule');
+    box.textContent = ''; box.hidden = !m.length;
+    m.forEach((t) => { const p = document.createElement('div'); p.textContent = t; box.append(p); });
+  }
   function renderSuivi() {
     const saved = contracts.find((x) => x.id === cur.id), box = $('#suivi');
     $('#suiviBox').hidden = !saved; box.textContent = ''; if (!saved) return;
@@ -201,10 +213,13 @@
     const i = e.target; if (!i.dataset.k) return;
     setP(cur, i.dataset.k, i.value);
     if (i.dataset.k === 'prixNuit') autoPrix = false;
+    if (i.dataset.k === 'menage') autoMenage = false;
+    if (i.dataset.k === 'suppAnimaux') autoAnimaux = false;
     $('#err').hidden = true;
     // Proposer un départ 7 nuits après l'arrivée tant que le départ est vide.
     if (i.dataset.k === 'arrivee' && i.value && !cur.depart) { const [y, m, j] = i.value.split('-').map(Number); const t = new Date(y, m - 1, j + 7, 12); cur.depart = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); $('#depart').value = cur.depart; }
-    if (i.dataset.k === 'arrivee' || i.dataset.k === 'depart') applyPrix();
+    if (i.dataset.k === 'arrivee' || i.dataset.k === 'depart') { applyPrix(); showRule(); }
+    if (i.dataset.k === 'arrivee' || i.dataset.k === 'depart' || i.dataset.k === 'animaux') applyAuto();
     refresh();
   });
   function save() {
@@ -250,6 +265,7 @@
   // ---------- réglages ----------
   function renderSettings() {
     $$('#v-set [data-s]').forEach((i) => { const v = getP(S, i.dataset.s); i.value = v == null ? '' : String(v).replace('.', i.inputMode === 'decimal' ? ',' : '.'); });
+    $('#seuilLbl').textContent = String(num(S.menageSeuil));
     $('#tok').value = window.Agenda.token.get(); $('#pass').value = window.Coffre.pass.get();
     const has = !!S.signature; $('#sigImg').hidden = !has; if (has) $('#sigImg').src = S.signature;
     $('#sigTxt').textContent = has ? 'Signature enregistrée' : 'Aucune signature';
