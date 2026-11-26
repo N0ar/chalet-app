@@ -1,6 +1,6 @@
 /* Le Chalet Sciez — application de contrats. Tout est stocké sur l'appareil (localStorage). */
 (function () {
-  const VERSION = '1.6';
+  const VERSION = '1.7';
   const $ = (q) => document.querySelector(q), $$ = (q) => Array.from(document.querySelectorAll(q));
   const { compute, check, build, fileName, eur, dmy, num } = window.Contrat;
 
